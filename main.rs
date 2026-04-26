@@ -1,19 +1,71 @@
-fn main() {
-    let mut num = 10;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-    let ptr = &mut num as *mut i32;
+#[derive(Debug)]
+struct Task {
+    description: String,
+    done: bool,
+}
 
-    unsafe {
-        *ptr = 25;
-        println!("New value through pointer: {}", *ptr);
+#[derive(Debug)]
+struct TaskList {
+    tasks: Vec<Task>,
+}
+
+struct User {
+    name: String,
+    shared_list: Rc<RefCell<TaskList>>,
+}
+
+impl User {
+    fn add_task(&self, description: String) {
+        let mut list = self.shared_list.borrow_mut();
+        list.tasks.push(Task {
+            description,
+            done: false,
+        });
+        println!("{} added a task.", self.name);
     }
 
-    println!("Value of num: {}", num);
+    fn mark_task_done(&self, index: usize) {
+        let mut list = self.shared_list.borrow_mut();
 
-    // Dangerous examples (do not run):
-    // let null_ptr: *const i32 = std::ptr::null();
-    // Dereferencing null_ptr would crash.
+        if let Some(task) = list.tasks.get_mut(index) {
+            task.done = true;
+            println!("{} completed task {}", self.name, index);
+        } else {
+            println!("Invalid task index.");
+        }
+    }
 
-    // Dangling pointer example:
-    // A pointer to memory already freed can cause undefined behavior.
+    fn print_tasks(&self) {
+        let list = self.shared_list.borrow();
+
+        println!("\nShared Task List:");
+        for (i, task) in list.tasks.iter().enumerate() {
+            let status = if task.done { "Done" } else { "Pending" };
+            println!("{}: {} [{}]", i, task.description, status);
+        }
+    }
+}
+
+fn main() {
+    let shared_tasks = Rc::new(RefCell::new(TaskList { tasks: Vec::new() }));
+
+    let user1 = User {
+        name: String::from("Alice"),
+        shared_list: Rc::clone(&shared_tasks),
+    };
+
+    let user2 = User {
+        name: String::from("Bob"),
+        shared_list: Rc::clone(&shared_tasks),
+    };
+
+    user1.add_task(String::from("Finish Rust homework"));
+    user2.add_task(String::from("Review ownership rules"));
+
+    user1.mark_task_done(0);
+
+    user1.print_tasks();
 }
